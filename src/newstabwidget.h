@@ -77,6 +77,7 @@ public:
   void setBrowserPosition();
   void markNewsRead();
   void markAllNewsRead();
+  void viewAllYoutubeVideos();
   void markNewsStar();
   void setLabelNews(int labelId);
   void deleteNews();

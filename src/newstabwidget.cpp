@@ -1036,6 +1036,65 @@ void NewsTabWidget::markAllNewsRead()
   mainWindow_->recountCategoryCounts();
 }
 
+void NewsTabWidget::viewAllYoutubeVideos()
+{
+  if (type_ != TabTypeUnread) return;
+  int cnt = newsModel_->rowCount();
+  if (cnt == 0) return;
+  struct YoutubeVideoData
+  {
+      QString VideoTitle;
+      QString VideoId;
+  };
+  QList<YoutubeVideoData> allYoutubeVideos;
+  for (int i = cnt-1; i > -1; --i) {
+      bool read = (newsModel_->dataField(i, "read").toInt() > 0);
+      if (read) continue; //they might still be in the Unread category but just recently read moments ago
+      QUrl htmlUrl = QUrl::fromEncoded(getLinkNews(i).toUtf8());
+      QString host = htmlUrl.host();
+      if (host == "youtube.com" || host == "www.youtube.com") {
+          QUrlQuery query(htmlUrl);
+          QString videoId = query.queryItemValue("v");
+          if (!videoId.isEmpty()) {
+            QString videoTitle = newsModel_->dataField(i, "title").toString();
+            allYoutubeVideos.append(YoutubeVideoData{videoTitle, videoId});
+          }
+      }
+  }
+  if (allYoutubeVideos.isEmpty()) return;
+  QFile sequentialYoutubePlayerHtmlFile;
+  sequentialYoutubePlayerHtmlFile.setFileName(":/html/sequential_youtube_player");
+  sequentialYoutubePlayerHtmlFile.open(QFile::ReadOnly);
+  QString sequentialYoutubePlayerHtml = QString::fromUtf8(sequentialYoutubePlayerHtmlFile.readAll());
+  sequentialYoutubePlayerHtmlFile.close();
+
+  QString videoTitlesAndIdsJavascript;
+  bool first = true;
+  foreach (const YoutubeVideoData &ytVideo, allYoutubeVideos) {
+      if (!first) {
+          videoTitlesAndIdsJavascript += ",\n";
+      }
+      first = false;
+      QString jsTitle = ytVideo.VideoTitle;
+      jsTitle.replace("\"", "\\\"");
+      QString jsId = ytVideo.VideoId;
+      jsId.replace("\"", "\\\"");
+      videoTitlesAndIdsJavascript += "{ title: \"" + jsTitle + "\", id: \"" + jsId + "\" }";
+  }
+
+  sequentialYoutubePlayerHtml = sequentialYoutubePlayerHtml.arg(videoTitlesAndIdsJavascript);
+
+  QTemporaryFile tempFile(QDir::tempPath() + "/sequential-youtube-player-XXXXXX.html");
+  if (tempFile.open()) {
+      tempFile.setAutoRemove(false);
+      QTextStream tempFileStream(&tempFile);
+      tempFileStream << sequentialYoutubePlayerHtml;
+      tempFile.close();
+      QUrl tempFileUrl = "file://" + tempFile.fileName();
+      openUrl(tempFileUrl);
+  }
+}
+
 /** @brief Mark selected news Starred
  *----------------------------------------------------------------------------*/
 void NewsTabWidget::markNewsStar()
